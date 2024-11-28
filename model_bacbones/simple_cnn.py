@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SimpleCNN(nn.Module):
-    def _init_(self, input_shape, output_shape):
-        super(SimpleCNN, self)._init_()
+    def __init__(self, input_shape, output_shape):
+        super(SimpleCNN, self).__init__()
 
         # Define convolutional layers
         self.conv1 = nn.Conv2d(input_shape[0], 32, kernel_size=3, stride=2, padding=1)

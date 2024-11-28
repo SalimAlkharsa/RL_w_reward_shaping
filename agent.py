@@ -9,7 +9,7 @@ import torch
 from model_bacbones.simple_cnn import SimpleCNN as DQN
 
 class DQNAgent:
-    def _init_(self, env, model, batch_size=32, gamma=0.99, epsilon=1.0, epsilon_min=0.01, epsilon_decay=0.995, learning_rate=1e-4):
+    def __init__(self, env, model, batch_size=32, gamma=0.99, epsilon=1.0, epsilon_min=0.01, epsilon_decay=0.995, learning_rate=1e-4):
         self.env = env
         self.model = model
         self.target_model = DQN(env.observation_space.shape, env.action_space.n)  # Target model for stability

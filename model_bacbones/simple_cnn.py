@@ -1,66 +1,52 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class SimpleCNN(nn.Module):
-    def __init__(self, input_shape, output_shape):
-        super(SimpleCNN, self).__init__()
-        
-        # Extract properties of the input shape
-        self.input_shape = input_shape
-        self.output_shape = output_shape
+    def _init_(self, input_shape, output_shape):
+        super(SimpleCNN, self)._init_()
 
-        # Extract the number of channels from the input shape
-        n_channels = input_shape[0]
-        # Extract the height and width from the input shape
-        height, width = input_shape[1], input_shape[2]
+        # Define convolutional layers
+        self.conv1 = nn.Conv2d(input_shape[0], 32, kernel_size=3, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
 
-        # Define a 3 layer CNN with adjusted kernel sizes and strides
-        self.conv1 = nn.Conv2d(n_channels, 32, kernel_size=3, stride=2)
-        conv1_output_shape = self.get_conv_output_shape(input_shape, self.conv1)
+        # Create a dummy input to get the flattened size after conv layers
+        self.dummy_input = torch.zeros(1, *input_shape)
+        self._get_flattened_size()  # Calculate flattened size dynamically
+
+        # Fully connected layers
         
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=1, stride=2)
-        conv2_output_shape = self.get_conv_output_shape(conv1_output_shape, self.conv2)
-        
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=1, stride=2)
-        conv3_output_shape = self.get_conv_output_shape(conv2_output_shape, self.conv3)
-        
-        # Calculate the size of the flattened feature map
-        n_flatten = conv3_output_shape[0] * conv3_output_shape[1] * conv3_output_shape[2]
-        
-        # Define the fully connected layer
-        self.fc1 = nn.Linear(n_flatten, 512)
+        self.fc1 = nn.Linear(self.flattened_size, 512)
         self.fc2 = nn.Linear(512, output_shape)
-        
-    def forward(self, x):
-        print('input shape:', x.shape)
-        x = torch.relu(self.conv1(x))
-        print('conv1 shape:', x.shape)
-        x = torch.relu(self.conv2(x))
-        print('conv2 shape:', x.shape)
-        x = torch.relu(self.conv3(x))
-        print('conv3 shape:', x.shape)
-        
-        x = x.view(x.size(0), -1)  # Flatten the tensor
-        print('flatten shape:', x.shape)
-        
-        x = torch.relu(self.fc1(x))
-        print('fc1 shape:', x.shape)
 
+    def _get_flattened_size(self):
+        # Pass the dummy input through the conv layers to calculate the flattened size
+        x = self.dummy_input
+        x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
+        x = torch.relu(self.conv3(x))
+
+        # Flatten the output of the conv layers
+        x = x.view(x.size(0), -1)  # Flatten
+        self.flattened_size = x.size(1)  # Get the size after flattening
+
+        # Print the flattened size for debugging purposes
+        print(f"Flattened size after conv layers: {self.flattened_size}")
+
+    def forward(self, x):
+        # Forward pass through convolutional layers
+        x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
+        x = torch.relu(self.conv3(x))
+
+        # Flatten the output for the fully connected layers
+        x = x.view(x.size(0), -1)
+
+        # Pass through fully connected layers
+        print(x.shape)  # After flattening
+
+        x = torch.relu(self.fc1(x))
         x = self.fc2(x)
-        print('fc2 shape:', x.shape)
 
         return x
-        
-    @staticmethod
-    def get_conv_output_shape(input_shape, conv_layer):
-        # Extract the number of channels from the input shape
-        n_channels = input_shape[0]
-        # Extract the height and width from the input shape
-        height, width = input_shape[1], input_shape[2]
-        
-        # Get the output shape of the convolutional layer
-        output_channels, output_height, output_width = conv_layer(
-            torch.zeros(1, n_channels, height, width)
-        ).shape[1:]
-        
-        return output_channels, output_height, output_width

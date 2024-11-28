@@ -9,7 +9,7 @@ import torch
 from model_bacbones.simple_cnn import SimpleCNN as DQN
 
 class DQNAgent:
-    def __init__(self, env, model, batch_size=32, gamma=0.99, epsilon=1.0, epsilon_min=0.01, epsilon_decay=0.995, learning_rate=1e-4):
+    def _init_(self, env, model, batch_size=32, gamma=0.99, epsilon=1.0, epsilon_min=0.01, epsilon_decay=0.995, learning_rate=1e-4):
         self.env = env
         self.model = model
         self.target_model = DQN(env.observation_space.shape, env.action_space.n)  # Target model for stability
@@ -30,18 +30,21 @@ class DQNAgent:
     
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
-    
+
     def replay(self):
         if len(self.memory) < self.batch_size:
             return
+        
         batch = random.sample(self.memory, self.batch_size)
         
         states, actions, rewards, next_states, dones = zip(*batch)
         
-        states = torch.tensor(states, dtype=torch.float32)
+        # Ensure states and next_states are of consistent shape before conversion
+        states = torch.stack([torch.tensor(state, dtype=torch.float32) for state in states])
+        next_states = torch.stack([torch.tensor(next_state, dtype=torch.float32) for next_state in next_states])
+        
         actions = torch.tensor(actions, dtype=torch.long)
         rewards = torch.tensor(rewards, dtype=torch.float32)
-        next_states = torch.tensor(next_states, dtype=torch.float32)
         dones = torch.tensor(dones, dtype=torch.bool)
         
         # Compute Q values for current states
@@ -62,6 +65,7 @@ class DQNAgent:
         # Reduce epsilon (decay)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+
     
     def update_target_model(self):
         self.target_model.load_state_dict(self.model.state_dict())

@@ -1,5 +1,5 @@
 import numpy as np
-
+import torch
 from agent import DQNAgent
 from environment_set_up import EnvironmentSetup
 from model_bacbones.simple_cnn import SimpleCNN
@@ -18,16 +18,10 @@ def train_dqn(agent, n_episodes=1000):
         
         done = False
         while not done:
-            action = agent.act(state)
-            next_state, reward, terminated, truncated, _ = agent.env.step(action)
+            state_tensor = torch.tensor(state, dtype=torch.float32)
+            action = agent.act(state_tensor)
+            next_state, reward, done, info, _ = agent.env.step(action)
 
-            # Make sure to cast the types as bool when applicable
-            terminated = bool(terminated)
-            truncated = bool(truncated)
-            
-            # Handle the new 'done' flag logic in Gym v0.26+ 
-            done = terminated or truncated
-            
             # Again, check if next_state is a tuple
             if isinstance(next_state, tuple):
                 next_state = next_state[0]  # Extract the actual state from the tuple
@@ -46,8 +40,6 @@ def train_dqn(agent, n_episodes=1000):
         print(f"Episode {episode+1}/{n_episodes} - Total Reward: {total_reward}")
 
     agent.env.close()
-
-
 
 # Initialize environment, model, and agent
 env_setup = EnvironmentSetup()

@@ -1,11 +1,10 @@
 import numpy as np
+import argparse
 from agent import DQNAgent, QNetwork, ReplayBuffer
 from environment_set_up import EnvironmentSetup
-
-
 import time
 
-def train_dqn(agent, n_episodes=500, target_update_freq=1000, render_freq=500):
+def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000):
     for episode in range(n_episodes):
         # Reset environment and preprocess state
         state_info = agent.env.reset()
@@ -24,12 +23,7 @@ def train_dqn(agent, n_episodes=500, target_update_freq=1000, render_freq=500):
             next_state, reward, done, truncated, info = agent.env.step(action)  # Correct unpacking
             
             # Extract and flatten the next state
-            next_state = np.array(next_state[0]).flatten()  # Extract and flatten visual frame
-            if state.shape != next_state.shape:
-                continue
-            # Check the shape after flattening
-            print(f"Next state shape after flattening: {next_state.shape}")
-            print(f"Next state after flattening: {state.shape}")
+            next_state = np.array(next_state).flatten()  # Extract and flatten visual frame
             
             # Store experience in replay buffer
             agent.replay_buffer.store((state, action, reward, next_state, done))
@@ -59,8 +53,12 @@ def train_dqn(agent, n_episodes=500, target_update_freq=1000, render_freq=500):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train DQN on Montezuma's Revenge or CartPole-v1")
+    parser.add_argument('--env', type=str, default="MontezumaRevenge-v4", choices=["MontezumaRevenge-v4", "CartPole-v1"], help="Environment to train on")
+    args = parser.parse_args()
+
     # Initialize environment
-    env_setup = EnvironmentSetup()
+    env_setup = EnvironmentSetup(env_name=args.env)
     obs_shape = env_setup.env.observation_space.shape
     n_actions = env_setup.env.action_space.n
 

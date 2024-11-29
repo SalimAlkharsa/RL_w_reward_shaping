@@ -61,11 +61,6 @@ class DQNAgent:
         
         batch = self.replay_buffer.sample(self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
-
-        # Check the shape of the states
-        print("State shapes in batch:")
-        for state in states:
-            print(state.shape)
         
         # Convert to tensors
         states = torch.tensor(states, dtype=torch.float32)

@@ -4,7 +4,7 @@ from agent import DQNAgent, QNetwork, ReplayBuffer
 from environment_set_up import EnvironmentSetup
 import time
 
-def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000):
+def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000, render=False):
     for episode in range(n_episodes):
         # Reset environment and preprocess state
         state_info = agent.env.reset()
@@ -36,7 +36,7 @@ def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000):
             total_reward += reward
             
             # Render environment periodically
-            if episode % render_freq == 0:
+            if render and episode % render_freq == 0:
                 agent.env.render()
                 time.sleep(0.1)  # Slow down the rendering for better visibility
 
@@ -55,10 +55,13 @@ def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train DQN on Montezuma's Revenge or CartPole-v1")
     parser.add_argument('--env', type=str, default="MontezumaRevenge-v4", choices=["MontezumaRevenge-v4", "CartPole-v1"], help="Environment to train on")
+    parser.add_argument('--n_episodes', type=int, default=5000, help="Number of episodes to train the agent")
+    parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
+    parser.add_argument('--render', action="store_true", help="Render the environment")
     args = parser.parse_args()
 
     # Initialize environment
-    env_setup = EnvironmentSetup(env_name=args.env)
+    env_setup = EnvironmentSetup(env_name=args.env, render_mode="human" if args.render else None)
     obs_shape = env_setup.env.observation_space.shape
     n_actions = env_setup.env.action_space.n
 
@@ -77,4 +80,4 @@ if __name__ == "__main__":
     agent = DQNAgent(env_setup.env, q_model, target_model, replay_buffer)
 
     # Train the agent
-    train_dqn(agent, n_episodes=5000)
+    train_dqn(agent, n_episodes=args.n_episodes, target_update_freq=args.target_update_freq, render=args.render)

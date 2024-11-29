@@ -4,7 +4,7 @@ from agent import DQNAgent, QNetwork, ReplayBuffer
 from environment_set_up import EnvironmentSetup
 import time
 
-def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000, render=False):
+def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000, render=False, timeout=90):
     for episode in range(n_episodes):
         # Reset environment and preprocess state
         state_info = agent.env.reset()
@@ -14,8 +14,14 @@ def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000, r
 
         total_reward = 0
         done = False
+        start_time = time.time()
         
         while not done:
+            # Check for timeout
+            if time.time() - start_time > timeout:
+                print(f"Episode {episode+1}: Timeout reached, skipping the rest of the episode.")
+                break
+            
             # Select action
             action = agent.act(state)
             
@@ -58,6 +64,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_episodes', type=int, default=5000, help="Number of episodes to train the agent")
     parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
     parser.add_argument('--render', action="store_true", help="Render the environment")
+    parser.add_argument('--timeout', type=int, default=240, help="Timeout for each episode in seconds")
     args = parser.parse_args()
 
     # Initialize environment
@@ -80,4 +87,4 @@ if __name__ == "__main__":
     agent = DQNAgent(env_setup.env, q_model, target_model, replay_buffer)
 
     # Train the agent
-    train_dqn(agent, n_episodes=args.n_episodes, target_update_freq=args.target_update_freq, render=args.render)
+    train_dqn(agent, n_episodes=args.n_episodes, target_update_freq=args.target_update_freq, render=args.render, timeout=args.timeout)

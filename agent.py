@@ -34,7 +34,7 @@ class ReplayBuffer:
 
 
 class DQNAgent:
-    def __init__(self, env, q_model, target_model, replay_buffer, batch_size=32, gamma=0.99, epsilon=1.0, epsilon_min=0.1, epsilon_decay=0.995, learning_rate=1e-4):
+    def __init__(self, env, q_model, target_model, replay_buffer, batch_size=32, gamma=0.99, epsilon=1, epsilon_min=0.1, epsilon_decay=0.995, learning_rate=1e-4):
         self.env = env
         self.q_model = q_model
         self.target_model = target_model

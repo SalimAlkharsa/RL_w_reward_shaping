@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+import os
 
 import torch
 from agent import DQNAgent, QNetwork, ReplayBuffer
@@ -9,13 +10,16 @@ import matplotlib.pyplot as plt
 import cv2
 import logging  # Add logging module
 
-from helpers import DEVICE, LastVisitedElements
+from helpers import DEVICE, LastVisitedElements, save_model, shape_rewards
 
 # Configure logging
 logging.basicConfig(filename='training.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
+# Global variables
 DISTANCE_THRESHOLD = 8  # Minimum distance to consider a corner as visited
 MAX_STEPS = 5000  # Maximum number of steps per episode
+GAME = None
+SEED = 42
 
 def visualize_frame(frame, agent_position=None, key_position=None, ladder_position=None ,filename="next_frame.png"):
     logging.info("Visualizing frame...")
@@ -48,7 +52,8 @@ def visualize_frame(frame, agent_position=None, key_position=None, ladder_positi
 
 def identify_agent(frame):
     # Define the agent's color in RGB format (initial color)
-    agent_color_rgb = np.array([200, 72, 72])  # Red color (target color)
+    if GAME == "MontezumaRevenge-v4":
+        agent_color_rgb = np.array([200, 72, 72])  # Red color (target color)
 
     # Convert the frame to HSV color space for better range matching
     frame_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
@@ -79,7 +84,6 @@ def identify_agent(frame):
             x = int(M["m10"] / M["m00"])
             y = int(M["m01"] / M["m00"])
             return x, y
-    
     return None
 
 
@@ -112,7 +116,7 @@ def identify_corners(map_resized, graph=False):
     return corner_locations
 
 
-def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_freq=100, render_freq=10, render=False):
+def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_freq=100, render_freq=10, render=False, save_freq=50):
     for episode in range(n_episodes):
         # Reset environment and preprocess state
         state_info = agent.env.reset()
@@ -139,7 +143,6 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
         ######## DEBUGGING ########
         logging.info(f"Agent starting position: {identify_agent(resized_state)}")
-        print
 
         ######## DEBUGGING ########
 
@@ -149,11 +152,15 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
         # Temporarily set render mode to "human" every 10 episodes
         if episode % render_freq == 0 and render and episode > 0:
+            print("Rendering the environment...FFF")
             agent.env = EnvironmentSetup(env_name=game, render_mode="human").env
             agent.env.reset()
         else:
             agent.env = EnvironmentSetup(env_name=game, render_mode=None).env
             agent.env.reset()
+        agent.env.action_space.seed(SEED)
+        agent.env.seed(SEED)
+        agent.env.observation_space.seed(SEED)
 
 
         # Training loop 
@@ -176,36 +183,12 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             next_state = np.array(next_state)
             next_state = cv2.resize(next_state, (32, 32))
 
-            # visualize_frame(next_state, filename="next_frame.png")
-            
-
             # Locate the agent in the frame (remember we are working with the resized frame)
             agent_position = identify_agent(next_state)
-            # Update the visited corners based on the agent's position
-            # Iterate over each corner and check if the agent is close enough
-            if agent_position is not None:
-                for corner in corners:
-                    # Calculate the Euclidean distance between the agent and the corner
-                    distance = np.sqrt((corner[0] - agent_position[0])**2 + (corner[1] - agent_position[1])**2)
-                    
-                    # If the distance is within the threshold, mark the corner as visited
-                    if distance <= DISTANCE_THRESHOLD and corner not in corners_visited:
-                        corners_visited.add(corner)
-                        # Reward the agent for visiting a new corner
-                        reward += 1
-                        # Update the last visited corners stack
-                        last_visited_corners.add_element(corner)
-                        
-
-                    # Let us also reward the agent for getting closer to UNVISITED corners
-                    elif corner not in corners_visited:
-                        reward += 0.1 / distance
-
-                    # Penalize the agent for going to a cornner it just visited
-                    elif distance <= DISTANCE_THRESHOLD and corner in last_visited_corners.get_elements():
-                        reward -= 0.1
-
-
+            
+            # Apply the rewards shaping function here:
+            reward += shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD)
+        
             # Flatten prior to passing to the QNetwork
             flattened_next_state = np.array(next_state).flatten()
 
@@ -223,6 +206,10 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         if episode % target_update_freq == 0:
             agent.update_target_model()
         
+        # Save the model every save_freq episodes
+        if episode % save_freq == 0:
+            save_model(agent, episode, save_dir=f"models_{GAME}")
+        
         logging.info(f"Episode {episode+1}/{n_episodes}, Total Reward: {total_reward}")
         
         # Optionally close the environment after training
@@ -238,6 +225,7 @@ if __name__ == "__main__":
     parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
     parser.add_argument('--render', action="store_true", help="Render the environment")
     parser.add_argument('--render_freq', type=int, default=50, help="Frequency of rendering the environment")
+    parser.add_argument('--save_freq', type=int, default=2, help="Frequency of saving the model")
     args = parser.parse_args()
 
     # Initialize environment
@@ -252,6 +240,7 @@ if __name__ == "__main__":
     # Initialize models
     # Device setup for Mac (MPS), CUDA, or CPU
     device = DEVICE
+    GAME = args.env
     logging.info(f"Using device: {device}")
     q_model = QNetwork(input_dim, n_actions).to(device)
     target_model = QNetwork(input_dim, n_actions)
@@ -265,4 +254,4 @@ if __name__ == "__main__":
 
     # Train the agent
     train_dqn(agent, game=args.env, n_episodes=args.n_episodes, target_update_freq=args.target_update_freq, render_freq=args.render_freq,
-              render=args.render)
+              render=args.render, save_freq=args.save_freq)

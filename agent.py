@@ -9,45 +9,23 @@ import random
 from helpers import DEVICE
 
 class QNetwork(nn.Module):
-    def __init__(self, input_dim, n_actions):
+    def __init__(self, state_size, action_size):
         super(QNetwork, self).__init__()
-        # print(input_dim)
-        c, h, w = input_dim
-        self.conv1 = nn.Conv2d(in_channels=c, out_channels= 32, kernel_size=4, stride=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1)
-        self.fc1 = nn.Linear(7*7*64, 512)
-        self.fc2 = nn.Linear(512, n_actions)
-
-        # Compute flattened size
-        convw = ((w - 4) // 1 + 1)  # After Conv1
-        convw = ((convw - 4) // 2 + 1)  # After Conv2
-        convw = ((convw - 3) // 1 + 1)  # After Conv3
-
-        convh = ((h - 4) // 1 + 1)  # After Conv1
-        convh = ((convh - 4) // 2 + 1)  # After Conv2
-        convh = ((convh - 3) // 1 + 1)  # After Conv3
-
-        conv_output_size = convw * convh * 64  # 64 is the output channels of Conv3
-
-        self.fc1 = nn.Linear(conv_output_size, 512)
-        self.fc2 = nn.Linear(512, n_actions)
-
+        self.fc1 = nn.Linear(state_size, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, action_size)
+    
     def forward(self, x):
-        x = x.to(self.conv1.weight.device).to(self.conv1.weight.dtype) 
-        # rearrange x to be BCHW
-        x = x.permute(0, 3, 1, 2)
-
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.reshape(x.size(0), -1) 
+        # make x a float tensor
+        x = x.float()
         x = F.relu(self.fc1(x))
-        return self.fc2(x)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 
 class ReplayBuffer:
-    def __init__(self, capacity=10**6):
+    def __init__(self, capacity=50**4):
         self.memory = deque(maxlen=capacity)
     
     def store(self, experience):

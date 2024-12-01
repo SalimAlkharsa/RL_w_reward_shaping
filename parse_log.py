@@ -39,6 +39,6 @@ def plot_rewards(episodes, rewards):
     plt.show()
 
 if __name__ == "__main__":
-    log_file = 'temp.log'
+    log_file = 'training.log'
     episodes, rewards = parse_log_file(log_file)
     plot_rewards(episodes, rewards)

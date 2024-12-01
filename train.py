@@ -153,6 +153,8 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         agent.env.action_space.seed(SEED)
         agent.env.seed(SEED)
         agent.env.observation_space.seed(SEED)
+        # Flatten the state
+        flattened_state = np.array(resized_state).flatten()
 
 
         # Training loop 
@@ -166,7 +168,7 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             
             # Select action
             # action = agent.act(flattened_state)
-            action = agent.act(resized_state)
+            action = agent.act(flattened_state)
             
             # Take action in the environment
             next_state, reward, done, truncated, info = agent.env.step(action)  # Correct unpacking
@@ -186,13 +188,12 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             flattened_next_state = np.array(next_state).flatten()
 
             # agent.replay_buffer.store((flattened_state, action, reward, flattened_next_state, done))
-            agent.replay_buffer.store((resized_state, action, reward, next_state, done))
+            agent.replay_buffer.store((flattened_state, action, reward, flattened_state, done))
             # Learn from replay buffer
             agent.replay()
             
             # Update state
             flattened_state = flattened_next_state
-            resized_state = next_state
             total_reward += reward
 
         # Update target network periodically
@@ -233,7 +234,7 @@ if __name__ == "__main__":
 
     # Flattened input dimension
     input_dim = np.prod(obs_shape)
-    input_dim = (3, 32, 32) # ---> due to the resizing of the frame
+    input_dim = 3 * 32 * 32 # ---> due to the resizing of the frame
 
     # Initialize models
     # Device setup for Mac (MPS), CUDA, or CPU

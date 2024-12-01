@@ -208,14 +208,6 @@ def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000, r
             ladder_position, _ = identify_closest_ladder(next_state, agent_position)
             #visualize_frame(next_state, agent_position=agent_position, key_position=key_position, ladder_position=ladder_position,
             #                filename="next_frame.png")
-
-            flattened_next_state = tuple(np.array(next_state).flatten())  # Convert to hashable type
-            if flattened_next_state not in visited_states:
-                visited_states[flattened_next_state] = 1
-                reward += 0.0  # Reward for visiting a new state
-            else:
-                visited_states[flattened_next_state] += 1
-                reward -= 0.0  # Small penalty for revisiting a state
                 
             # Reward the agent if it gets closer to the key
             if agent_position and key_position:
@@ -225,8 +217,8 @@ def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=5000, r
                 # Reward the agent for getting closer to the ladder too
                 if ladder_position:
                     ladder_x, ladder_y = ladder_position
-                    ladder_distance = np.sqrt((agent_x - ladder_x) ** 2 + (agent_y - ladder_y) ** 2)
-                    reward += (1 - ladder_distance / 100)*2
+                    ladder_distance = np.sqrt((agent_x - ladder_x) ** 2)# + (agent_y - ladder_y) ** 2)
+                    reward += (1 - ladder_distance / 100) * 50
                 reward += 1 - distance / 100
 
             # flatten the next state?

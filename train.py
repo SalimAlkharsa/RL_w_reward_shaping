@@ -1,5 +1,7 @@
 import numpy as np
 import argparse
+
+import torch
 from agent import DQNAgent, QNetwork, ReplayBuffer
 from environment_set_up import EnvironmentSetup
 import time
@@ -7,7 +9,7 @@ import matplotlib.pyplot as plt
 import cv2
 import logging  # Add logging module
 
-from helpers import LastVisitedElements
+from helpers import DEVICE, LastVisitedElements
 
 # Configure logging
 logging.basicConfig(filename='training.log', level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -164,7 +166,8 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             
             
             # Select action
-            action = agent.act(flattened_state)
+            # action = agent.act(flattened_state)
+            action = agent.act(resized_state)
             
             # Take action in the environment
             next_state, reward, done, truncated, info = agent.env.step(action)  # Correct unpacking
@@ -206,12 +209,14 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             # Flatten prior to passing to the QNetwork
             flattened_next_state = np.array(next_state).flatten()
 
-            agent.replay_buffer.store((flattened_state, action, reward, flattened_next_state, done))
+            # agent.replay_buffer.store((flattened_state, action, reward, flattened_next_state, done))
+            agent.replay_buffer.store((resized_state, action, reward, next_state, done))
             # Learn from replay buffer
             agent.replay()
             
             # Update state
             flattened_state = flattened_next_state
+            resized_state = next_state
             total_reward += reward
 
         # Update target network periodically
@@ -242,10 +247,13 @@ if __name__ == "__main__":
 
     # Flattened input dimension
     input_dim = np.prod(obs_shape)
-    input_dim = 32*32*3 # ---> due to the resizing of the frame
+    input_dim = (3, 32, 32) # ---> due to the resizing of the frame
 
     # Initialize models
-    q_model = QNetwork(input_dim, n_actions)
+    # Device setup for Mac (MPS), CUDA, or CPU
+    device = DEVICE
+    logging.info(f"Using device: {device}")
+    q_model = QNetwork(input_dim, n_actions).to(device)
     target_model = QNetwork(input_dim, n_actions)
     target_model.load_state_dict(q_model.state_dict())  # Synchronize weights
 

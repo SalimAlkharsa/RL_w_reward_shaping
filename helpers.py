@@ -1,4 +1,15 @@
 from collections import deque
+import torch
+
+
+# Define the device to be used
+if torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")  # Use MPS if available
+    DEVICE = torch.device("cpu") # Default to CPU even w MPS due to time constraints
+elif torch.cuda.is_available():
+    DEVICE = torch.device("cuda")  # Use CUDA if available
+else:
+    DEVICE = torch.device("cpu")  # Default to CPU if no GPU is available
 
 class LastVisitedElements:
     def __init__(self, max_size=3):

@@ -12,13 +12,9 @@ import logging  # Add logging module
 
 from helpers import DEVICE, LastVisitedElements, save_model, shape_rewards
 
-# Configure logging
-logging.basicConfig(filename='training.log', level=logging.INFO, format='%(asctime)s - %(message)s')
-
 # Global variables
 DISTANCE_THRESHOLD = 8  # Minimum distance to consider a corner as visited
 MAX_STEPS = 5000  # Maximum number of steps per episode
-GAME = None
 SEED = 42
 
 def visualize_frame(frame, agent_position=None, key_position=None, ladder_position=None ,filename="next_frame.png"):
@@ -50,10 +46,12 @@ def visualize_frame(frame, agent_position=None, key_position=None, ladder_positi
     plt.savefig(filename)
     print(f"Frame saved as {filename}.")
 
-def identify_agent(frame):
+def identify_agent(frame, game="MontezumaRevenge-v4"):
     # Define the agent's color in RGB format (initial color)
-    if GAME == "MontezumaRevenge-v4":
+    if game == "MontezumaRevenge-v4":
         agent_color_rgb = np.array([200, 72, 72])  # Red color (target color)
+    elif game == "Breakout-v4":
+        agent_color_rgb = np.array([213, 130, 74])
 
     # Convert the frame to HSV color space for better range matching
     frame_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
@@ -129,8 +127,6 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         
         resized_state = cv2.resize(state, (32, 32))
         # visualize_frame(resized_state, filename="next_frame.png")
-        flattened_state = np.array(resized_state).flatten() # --> need that to pass it to the QNetwork
-        logging.info(f"Flattened state shape: {flattened_state.shape}")
 
         # Identify the corners in the map
         corners = (identify_corners(resized_state, graph=True).tolist())
@@ -140,11 +136,6 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         corners_visited = set()  # Track visited corners
         # Track a stack of the last visited corners to penalize (limit size to 3)
         last_visited_corners = LastVisitedElements(max_size=10)
-
-        ######## DEBUGGING ########
-        logging.info(f"Agent starting position: {identify_agent(resized_state)}")
-
-        ######## DEBUGGING ########
 
         #### START HERE ####
         total_reward = 0
@@ -184,10 +175,10 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             next_state = cv2.resize(next_state, (32, 32))
 
             # Locate the agent in the frame (remember we are working with the resized frame)
-            agent_position = identify_agent(next_state)
+            agent_position = identify_agent(next_state, game=game)
             
-            # Apply the rewards shaping function here:
-            reward += shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD)
+            # Apply the rewards shaping function here: (commented out for baseline)
+            # reward += shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD)
         
             # Flatten prior to passing to the QNetwork
             flattened_next_state = np.array(next_state).flatten()
@@ -208,7 +199,7 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         
         # Save the model every save_freq episodes
         if episode % save_freq == 0:
-            save_model(agent, episode, save_dir=f"models_{GAME}")
+            save_model(agent, episode, save_dir=f"models_{game}")
         
         logging.info(f"Episode {episode+1}/{n_episodes}, Total Reward: {total_reward}")
         
@@ -220,13 +211,18 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train DQN on Montezuma's Revenge or CartPole-v1")
-    parser.add_argument('--env', type=str, default="MontezumaRevenge-v4", choices=["MontezumaRevenge-v4", "CartPole-v1"], help="Environment to train on")
+    parser.add_argument('--env', type=str, default="MontezumaRevenge-v4", choices=["MontezumaRevenge-v4", "CartPole-v1", "Breakout-v4"], help="Environment to train on")
     parser.add_argument('--n_episodes', type=int, default=5000, help="Number of episodes to train the agent")
     parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
     parser.add_argument('--render', action="store_true", help="Render the environment")
     parser.add_argument('--render_freq', type=int, default=50, help="Frequency of rendering the environment")
     parser.add_argument('--save_freq', type=int, default=2, help="Frequency of saving the model")
     args = parser.parse_args()
+
+
+    # Set logging
+    # Configure logging
+    logging.basicConfig(filename='training.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
     # Initialize environment
     env_setup = EnvironmentSetup(env_name=args.env, render_mode= None)#"human" if args.render else None)
@@ -240,10 +236,9 @@ if __name__ == "__main__":
     # Initialize models
     # Device setup for Mac (MPS), CUDA, or CPU
     device = DEVICE
-    GAME = args.env
     logging.info(f"Using device: {device}")
     q_model = QNetwork(input_dim, n_actions).to(device)
-    target_model = QNetwork(input_dim, n_actions)
+    target_model = QNetwork(input_dim, n_actions).to(device)
     target_model.load_state_dict(q_model.state_dict())  # Synchronize weights
 
     # Replay buffer

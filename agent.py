@@ -47,7 +47,7 @@ class QNetwork(nn.Module):
 
 
 class ReplayBuffer:
-    def __init__(self, capacity=2000):
+    def __init__(self, capacity=10**6):
         self.memory = deque(maxlen=capacity)
     
     def store(self, experience):

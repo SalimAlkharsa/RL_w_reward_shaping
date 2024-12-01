@@ -126,10 +126,11 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         logging.info(f"State shape: {state.shape}")
         
         resized_state = cv2.resize(state, (32, 32))
-        # visualize_frame(resized_state, filename="next_frame.png")
+        if episode == 0:
+            visualize_frame(resized_state, filename="next_frame.png")
 
         # Identify the corners in the map
-        corners = (identify_corners(resized_state, graph=True).tolist())
+        corners = (identify_corners(resized_state, graph=False).tolist())
         # hash the corners to avoid duplicates
         corners = [tuple(corner) for corner in corners]
         corners = set(corners)
@@ -176,6 +177,7 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
             # Locate the agent in the frame (remember we are working with the resized frame)
             agent_position = identify_agent(next_state, game=game)
+
             
             # Apply the rewards shaping function here: (commented out for baseline)
             # reward += shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD)

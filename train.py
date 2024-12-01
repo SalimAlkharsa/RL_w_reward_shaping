@@ -103,7 +103,7 @@ def identify_corners(map_resized, graph=False):
     return corner_locations
 
 
-def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=1000, render=False, timeout=90):
+def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_freq=100, render_freq=10, render=False):
     for episode in range(n_episodes):
         # Reset environment and preprocess state
         state_info = agent.env.reset()
@@ -136,8 +136,21 @@ def train_dqn(agent, n_episodes=500, target_update_freq=100, render_freq=1000, r
         total_reward = 0
         done = False
 
+        # Temporarily set render mode to "human" every 10 episodes
+        if episode % render_freq == 0 and render and episode > 0:
+            agent.env = EnvironmentSetup(env_name=game, render_mode="human").env
+            agent.env.reset()
+        else:
+            agent.env = EnvironmentSetup(env_name=game, render_mode=None).env
+            agent.env.reset()
+
+
         # Training loop    
         while not done:
+            # Render the environment every 10 episodes
+            # if render and episode % render_freq == 0:
+            #     agent.env.render(mode="human")
+            
             # Select action
             action = agent.act(flattened_state)
             
@@ -200,11 +213,11 @@ if __name__ == "__main__":
     parser.add_argument('--n_episodes', type=int, default=5000, help="Number of episodes to train the agent")
     parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
     parser.add_argument('--render', action="store_true", help="Render the environment")
-    parser.add_argument('--timeout', type=int, default=240, help="Timeout for each episode in seconds")
+    parser.add_argument('--render_freq', type=int, default=10, help="Frequency of rendering the environment")
     args = parser.parse_args()
 
     # Initialize environment
-    env_setup = EnvironmentSetup(env_name=args.env, render_mode= "human" if args.render else None)
+    env_setup = EnvironmentSetup(env_name=args.env, render_mode= None)#"human" if args.render else None)
     obs_shape = env_setup.env.observation_space.shape
     n_actions = env_setup.env.action_space.n
 
@@ -224,4 +237,5 @@ if __name__ == "__main__":
     agent = DQNAgent(env_setup.env, q_model, target_model, replay_buffer)
 
     # Train the agent
-    train_dqn(agent, n_episodes=args.n_episodes, target_update_freq=args.target_update_freq, render_freq=5,render=args.render, timeout=args.timeout)
+    train_dqn(agent, game=args.env, n_episodes=args.n_episodes, target_update_freq=args.target_update_freq, render_freq=args.render_freq,
+              render=args.render)

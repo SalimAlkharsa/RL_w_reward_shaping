@@ -62,13 +62,20 @@ class DQNAgent:
         batch = self.replay_buffer.sample(self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
         
+        # Convert to np arrays
+        states = np.array(states)
+        actions = np.array(actions)
+        rewards = np.array(rewards)
+        next_states = np.array(next_states)
+        dones = np.array(dones)
+        
         # Convert to tensors
         states = torch.tensor(states, dtype=torch.float32)
         actions = torch.tensor(actions, dtype=torch.long)
         rewards = torch.tensor(rewards, dtype=torch.float32)
         next_states = torch.tensor(next_states, dtype=torch.float32)
         dones = torch.tensor(dones, dtype=torch.bool)
-        
+
         # Compute Q(s, a)
         q_values = self.q_model(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         

@@ -58,5 +58,11 @@ def save_model(agent, episode, save_dir="default_save"):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     model_path = os.path.join(save_dir, f"model_episode_{episode}.pth")
-    torch.save(agent.q_model.state_dict(), model_path)
-    logging.info(f"Model saved at {model_path}")
+    torch.save({
+        'state_dict': agent.q_model.state_dict(),
+        'target_state_dict': agent.target_model.state_dict(),
+        'optimizer_state_dict': agent.optimizer.state_dict(),
+        'episode': episode,
+        'replay_buffer': agent.replay_buffer,
+        'epsilon': agent.epsilon,  # Save exploration rate if using epsilon-greedy
+     }, f"{save_dir}/model_episode_{episode}.pth")

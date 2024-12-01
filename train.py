@@ -5,12 +5,19 @@ from environment_set_up import EnvironmentSetup
 import time
 import matplotlib.pyplot as plt
 import cv2
+import logging  # Add logging module
 
-DISTANCE_THRESHOLD = 4  # Minimum distance to consider a corner as visited
+from helpers import LastVisitedElements
+
+# Configure logging
+logging.basicConfig(filename='training.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+
+DISTANCE_THRESHOLD = 8  # Minimum distance to consider a corner as visited
+MAX_STEPS = 5000  # Maximum number of steps per episode
 
 def visualize_frame(frame, agent_position=None, key_position=None, ladder_position=None ,filename="next_frame.png"):
-    print("Visualizing frame...")
-    print(frame.shape)
+    logging.info("Visualizing frame...")
+    logging.info(f"Frame shape: {frame.shape}")
     
     plt.imshow(frame)
     plt.axis('off')
@@ -112,12 +119,12 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         
         # Represenring the state as a 32x32 image 
         state = np.array(state_info[0])
-        print(f"State shape: {state.shape}")
+        logging.info(f"State shape: {state.shape}")
         
         resized_state = cv2.resize(state, (32, 32))
         # visualize_frame(resized_state, filename="next_frame.png")
         flattened_state = np.array(resized_state).flatten() # --> need that to pass it to the QNetwork
-        print(f"Flattened state shape: {flattened_state.shape}")
+        logging.info(f"Flattened state shape: {flattened_state.shape}")
 
         # Identify the corners in the map
         corners = (identify_corners(resized_state, graph=True).tolist())
@@ -125,9 +132,11 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         corners = [tuple(corner) for corner in corners]
         corners = set(corners)
         corners_visited = set()  # Track visited corners
+        # Track a stack of the last visited corners to penalize (limit size to 3)
+        last_visited_corners = LastVisitedElements(max_size=10)
 
         ######## DEBUGGING ########
-        print(f"Agent starting position: {identify_agent(resized_state)}")
+        logging.info(f"Agent starting position: {identify_agent(resized_state)}")
         print
 
         ######## DEBUGGING ########
@@ -145,11 +154,14 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             agent.env.reset()
 
 
-        # Training loop    
+        # Training loop 
+        actions = 0   
         while not done:
-            # Render the environment every 10 episodes
-            # if render and episode % render_freq == 0:
-            #     agent.env.render(mode="human")
+            actions += 1
+            if actions > MAX_STEPS:
+                logging.info("Max steps reached")
+                break
+            
             
             # Select action
             action = agent.act(flattened_state)
@@ -178,10 +190,17 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
                         corners_visited.add(corner)
                         # Reward the agent for visiting a new corner
                         reward += 1
+                        # Update the last visited corners stack
+                        last_visited_corners.add_element(corner)
+                        
 
                     # Let us also reward the agent for getting closer to UNVISITED corners
                     elif corner not in corners_visited:
                         reward += 0.1 / distance
+
+                    # Penalize the agent for going to a cornner it just visited
+                    elif distance <= DISTANCE_THRESHOLD and corner in last_visited_corners.get_elements():
+                        reward -= 0.1
 
 
             # Flatten prior to passing to the QNetwork
@@ -199,7 +218,7 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
         if episode % target_update_freq == 0:
             agent.update_target_model()
         
-        print(f"Episode {episode+1}/{n_episodes}, Total Reward: {total_reward}")
+        logging.info(f"Episode {episode+1}/{n_episodes}, Total Reward: {total_reward}")
         
         # Optionally close the environment after training
         if episode == n_episodes - 1:
@@ -213,7 +232,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_episodes', type=int, default=5000, help="Number of episodes to train the agent")
     parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
     parser.add_argument('--render', action="store_true", help="Render the environment")
-    parser.add_argument('--render_freq', type=int, default=10, help="Frequency of rendering the environment")
+    parser.add_argument('--render_freq', type=int, default=50, help="Frequency of rendering the environment")
     args = parser.parse_args()
 
     # Initialize environment

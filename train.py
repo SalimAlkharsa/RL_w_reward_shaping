@@ -175,12 +175,17 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
         # Save the model every `save_freq` episodes
         if episode % save_freq == 0:
-            save_model(agent, episode, save_dir=f"models_{game}")
+            if extrinsic:
+                save_model(agent, episode, save_dir=f"models_{game}_extrinsic")
+            else:
+                save_model(agent, episode, save_dir=f"models_{game}")
         
         if extrinsic:
             logging.info(f"Intrinsic reward: {reward}")
             logging.info(f"Extrinsic reward: {extrinsic_reward}")
             total_reward += extrinsic_reward
+        else:
+            total_reward += reward
 
         logging.info(f"Episode {episode+1}/{n_episodes}, Total Reward: {total_reward}")
 
@@ -200,7 +205,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set logging
-    logging.basicConfig(filename='CartPole.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+    logging.basicConfig(filename='Monte.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
     # Initialize environment
     env_setup = EnvironmentSetup(env_name=args.env, render_mode=None)

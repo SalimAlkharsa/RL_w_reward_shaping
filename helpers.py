@@ -30,7 +30,7 @@ class LastVisitedElements:
 def shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD=1):
     reward = 0
     # Iterate over each corner and check if the agent is close enough
-    if agent_position is not None:
+    if agent_position is not None and len(corners) > 0:
         for corner in corners:
             # Calculate the Euclidean distance between the agent and the corner
             distance = np.sqrt((corner[0] - agent_position[0])**2 + (corner[1] - agent_position[1])**2)
@@ -51,7 +51,7 @@ def shape_rewards(agent_position, corners, corners_visited, last_visited_corners
             # Penalize the agent for going to a cornner it just visited
             elif distance <= DISTANCE_THRESHOLD and corner in last_visited_corners.get_elements():
                 reward -= 0.1
-    return reward
+    return reward, corners_visited, last_visited_corners
 
 # Helper function to save the model
 def save_model(agent, episode, save_dir="default_save"):

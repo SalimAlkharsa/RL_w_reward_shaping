@@ -4,32 +4,43 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-import random
-
 from helpers import DEVICE
 
 class QNetwork(nn.Module):
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, latent_size=1024):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, action_size)
-    
-    def forward(self, x):
-        # make x a float tensor
-        x = x.float()
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+
+        # First transformation: Linear layer followed by activation (f1)
+        self.fc1 = nn.Linear(state_size, 5012)  # First linear transformation (sW1 + b1)
+        
+        # Second transformation: Linear layer followed by activation (f2)
+        self.fc2 = nn.Linear(5012, latent_size)  # Second linear transformation (f1 * W2 + b2)
+        
+        # Third transformation: Linear layer followed by activation (f3)
+        self.fc3 = nn.Linear(latent_size, action_size)  # Final output layer (f2 * W3 + b3)
+
+    def forward(self, state):
+        # Apply the transformations with activations between each layer as per f1, f2, f3
+        x = F.relu(self.fc1(state))  # Apply f1 activation after fc1
+        x = F.relu(self.fc2(x))  # Apply f2 activation after fc2
+        q_values = self.fc3(x)  # Apply fc3 to get the final Q-values
+        
+        return q_values
 
 
 class ReplayBuffer:
-    def __init__(self, capacity=50**4):
+    def __init__(self, capacity=10**4):
         self.memory = deque(maxlen=capacity)
     
     def store(self, experience):
-        self.memory.append(experience)
+        state, action, reward, next_state, done = experience
+        self.memory.append((
+        np.array(state, dtype=np.float32),
+        int(action),
+        float(reward),
+        np.array(next_state, dtype=np.float32),
+        bool(done)
+        ))
     
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
@@ -39,7 +50,8 @@ class ReplayBuffer:
 
 
 class DQNAgent:
-    def __init__(self, env, q_model, target_model, replay_buffer, batch_size=32, gamma=0.99, epsilon=1, epsilon_min=0.1, epsilon_decay=0.99, learning_rate=1e-3):
+    def __init__(self, env, q_model, target_model, replay_buffer, batch_size=32, gamma=0.995, epsilon=1.0, 
+                 epsilon_min=0.1, epsilon_decay=0.99, learning_rate=1e-4):
         self.env = env
         self.q_model = q_model
         self.target_model = target_model
@@ -55,7 +67,7 @@ class DQNAgent:
     def act(self, state):
         if random.random() <= self.epsilon:
             return self.env.action_space.sample()  # Random action
-        state = torch.tensor(state).unsqueeze(0)
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(DEVICE)
         with torch.no_grad():
             q_values = self.q_model(state)
         return torch.argmax(q_values).item()
@@ -67,31 +79,18 @@ class DQNAgent:
         batch = self.replay_buffer.sample(self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
         
-        # Convert to np arrays
-        states = np.array(states)
-        actions = np.array(actions)
-        rewards = np.array(rewards)
-        next_states = np.array(next_states)
-        dones = np.array(dones)
-        
-        # Convert to tensors
-        states = torch.tensor(states, dtype=torch.float32).to(DEVICE)
-        actions = torch.tensor(actions, dtype=torch.long).to(DEVICE)
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(DEVICE)
-        next_states = torch.tensor(next_states, dtype=torch.float32).to(DEVICE)
-        dones = torch.tensor(dones, dtype=torch.bool).to(DEVICE)
+        # Convert sampled data to tensors
+        states = torch.tensor(np.array(states), dtype=torch.float32).to(DEVICE)
+        actions = torch.tensor(actions, dtype=torch.long).to(DEVICE)  # Ensure actions are integers
+        rewards = torch.tensor(rewards, dtype=torch.float32).to(DEVICE)  # Ensure rewards are floats
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(DEVICE)
+        dones = torch.tensor(dones, dtype=torch.bool).to(DEVICE)  # Ensure dones are booleans
 
-        # Compute Q(s, a)
         q_values = self.q_model(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         
         # Compute target Q-values
-        # put gamma on the device of the next_states
-        self.gamma = torch.tensor(self.gamma, dtype=torch.float32, device=next_states.device).clone().detach()
         with torch.no_grad():
             max_next_q_values = self.target_model(next_states).max(1)[0]
-            # put max_next_q_values on the device of rewards
-            max_next_q_values = torch.tensor(max_next_q_values, dtype=torch.float32, device=rewards.device).clone().detach()
-            # do the operation
             target_q_values = rewards + self.gamma * max_next_q_values * (~dones)
         
         # Compute loss

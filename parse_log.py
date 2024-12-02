@@ -22,7 +22,7 @@ def parse_log_file(log_file):
 
 def plot_rewards(episodes, rewards):
     # Smooth the rewards by taking the moving average
-    window_size = 500
+    window_size = 50
     smoothed_rewards = []
     for i in range(len(rewards) - window_size + 1):
         smoothed_rewards.append(sum(rewards[i:i+window_size]) / window_size)
@@ -39,7 +39,7 @@ def plot_rewards(episodes, rewards):
     plt.show()
 
 if __name__ == "__main__":
-    log_file = 'training.log'
-    # log_file = 'breakout_shaping.log'
+    log_file = 'CartPole.log'
+    # log_file = 'Monte1.log'
     episodes, rewards = parse_log_file(log_file)
     plot_rewards(episodes, rewards)

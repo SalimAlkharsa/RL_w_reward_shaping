@@ -52,6 +52,8 @@ def identify_agent(frame, game="MontezumaRevenge-v4"):
         agent_color_rgb = np.array([200, 72, 72])  # Red color (target color)
     elif game == "Breakout-v4":
         agent_color_rgb = np.array([213, 130, 74])
+    elif game == "BankHeist-v4":
+        agent_color_rgb = np.array([76,46,15])
 
     # Convert the frame to HSV color space for better range matching
     frame_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
@@ -130,7 +132,8 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             visualize_frame(resized_state, filename="next_frame.png")
 
         # Identify the corners in the map
-        corners = (identify_corners(resized_state, graph=False).tolist())
+        x = False ### HEREEE
+        corners = (identify_corners(resized_state, graph=True).tolist()) if x else []
         # hash the corners to avoid duplicates
         corners = [tuple(corner) for corner in corners]
         corners = set(corners)
@@ -144,7 +147,6 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
         # Temporarily set render mode to "human" every 10 episodes
         if episode % render_freq == 0 and render and episode > 0:
-            print("Rendering the environment...FFF")
             agent.env = EnvironmentSetup(env_name=game, render_mode="human").env
             agent.env.reset()
         else:
@@ -178,11 +180,12 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
             next_state = cv2.resize(next_state, (32, 32))
 
             # Locate the agent in the frame (remember we are working with the resized frame)
-            agent_position = identify_agent(next_state, game=game)
-
-            
-            # Apply the rewards shaping function here: (commented out for baseline)
-            # reward += shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD)
+            x = False
+            if x == True: #### if shape rewards is enabled
+                agent_position = identify_agent(next_state, game=game)
+                # Apply the rewards shaping function here: (commented out for baseline)
+                clipped_reward = np.clip(shape_rewards(agent_position, corners, corners_visited, last_visited_corners, DISTANCE_THRESHOLD), -1, 1)
+                reward += clipped_reward
         
             # Flatten prior to passing to the QNetwork
             flattened_next_state = np.array(next_state).flatten()
@@ -214,7 +217,7 @@ def train_dqn(agent, game='MontezumaRevenge-v4', n_episodes=500, target_update_f
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train DQN on Montezuma's Revenge or CartPole-v1")
-    parser.add_argument('--env', type=str, default="MontezumaRevenge-v4", choices=["MontezumaRevenge-v4", "CartPole-v1", "Breakout-v4"], help="Environment to train on")
+    parser.add_argument('--env', type=str, default="MontezumaRevenge-v4", choices=["MontezumaRevenge-v4", "CartPole-v1", "Breakout-v4", "BankHeist-v4"], help="Environment to train on")
     parser.add_argument('--n_episodes', type=int, default=5000, help="Number of episodes to train the agent")
     parser.add_argument('--target_update_freq', type=int, default=100, help="Frequency of updating target network")
     parser.add_argument('--render', action="store_true", help="Render the environment")
@@ -225,7 +228,7 @@ if __name__ == "__main__":
 
     # Set logging
     # Configure logging
-    logging.basicConfig(filename='training.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+    logging.basicConfig(filename='PoleCart.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
     # Initialize environment
     env_setup = EnvironmentSetup(env_name=args.env, render_mode= None)#"human" if args.render else None)
@@ -234,7 +237,7 @@ if __name__ == "__main__":
 
     # Flattened input dimension
     input_dim = np.prod(obs_shape)
-    input_dim = 3 * 32 * 32 # ---> due to the resizing of the frame
+    input_dim = 3 * 32 * 32 # ---> due to the resizing of the frame (for atari)
 
     # Initialize models
     # Device setup for Mac (MPS), CUDA, or CPU
